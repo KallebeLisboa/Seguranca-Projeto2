@@ -25,7 +25,6 @@ A execução principal usa apenas a biblioteca padrão; Python 3.9 ou superior.
 | `tests/test_encoding.py` | Vetores MGF1 e conversões de inteiros/bytes |
 | `tests/test_private_key.py` | Importação privada, adulterações e consistência RSA/CRT |
 | `tests/test_oaep.py` | Cifragem/decifragem, limites e rejeição de padding inválido |
-| `GUIA_RAPIDO.md` | Comandos para executar e demonstrar o projeto |
 | `tests/test_interop.py` | Teste adicional opcional com biblioteca independente |
 | `ANALISE_SEGURANCA.md` | Parte V: justificativas, comparação e limitações |
 
@@ -122,7 +121,7 @@ A chave pública é fornecida separadamente e deve vir de uma fonte confiável.
 
 ## Entrega no Moodle
 
-Incluir os três módulos Python, a pasta `tests`, este README, o guia rápido e a análise de segurança.
+Incluir os três módulos Python, a pasta `tests`, este README e a análise de segurança.
 Executar os testes e conferir o conteúdo do pacote.
 Não incluir `.venv`, caches ou chaves privadas pessoais. Os comandos acima geram
 os exemplos necessários à apresentação. Consultar a [análise de segurança](ANALISE_SEGURANCA.md)
