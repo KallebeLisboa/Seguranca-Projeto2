@@ -41,7 +41,8 @@ def mgf1(seed: bytes, mask_len: int) -> bytes:
 
 def rsa_oaep_encrypt(pub_key: dict, message: bytes, label: bytes = b"") -> bytes:
     """Cifra uma mensagem curta utilizando RSA-OAEP com SHA3-256."""
-    k = pub_key['key_size_bits'] // 8
+    validate_public_key(pub_key)
+    k = (pub_key['n'].bit_length() + 7) // 8
     h_len = 32 # Tamanho do SHA3-256
     
     if len(message) > k - 2 * h_len - 2:
@@ -66,13 +67,18 @@ def rsa_oaep_encrypt(pub_key: dict, message: bytes, label: bytes = b"") -> bytes
 
 def rsa_oaep_decrypt(priv_key: dict, ciphertext: bytes, label: bytes = b"") -> bytes:
     """Decifra um criptograma RSA-OAEP e deteta adulterações ou erros de padding."""
-    k = priv_key['key_size_bits'] // 8
+    validate_public_key(priv_key)
+    if type(priv_key.get('d')) is not int or not 0 < priv_key['d'] < priv_key['n']:
+        raise ValueError("Expoente privado inválido.")
+    k = (priv_key['n'].bit_length() + 7) // 8
     h_len = 32
     
     if len(ciphertext) != k:
-        raise ValueError("Erro de decifragem: tamanho do criptograma inválido.")
+        raise ValueError("Erro de decifragem OAEP.")
     
     c_int = os2ip(ciphertext)
+    if c_int >= priv_key['n']:
+        raise ValueError("Erro de decifragem OAEP.")
     m_int = mod_exp(c_int, priv_key['d'], priv_key['n'])
     em = i2osp(m_int, k)
     
@@ -89,16 +95,23 @@ def rsa_oaep_decrypt(priv_key: dict, ciphertext: bytes, label: bytes = b"") -> b
     
     l_hash_prime = db[:h_len]
     
-    # Validação do padding de forma a evitar ataques de temporização (exigência de segurança)
-    if y != 0 or l_hash_prime != l_hash:
-        raise ValueError("Erro de decifragem: Padding OAEP inválido ou dados adulterados.")
-        
-    try:
-        separator_idx = db.index(b'\x01', h_len)
-    except ValueError:
-        raise ValueError("Erro de decifragem: Separador de padding não encontrado.")
-        
+    # Percorre todo o DB e usa a mesma mensagem para falhas do criptograma.
+    # Isso NÃO garante tempo constante em Python ou na exponenciação RSA.
+    invalid = (y != 0) | (not hmac.compare_digest(l_hash_prime, l_hash))
+    looking_for_separator = True
+    separator_idx = 0
+    for index in range(h_len, len(db)):
+        value = db[index]
+        if looking_for_separator:
+            if value == 1:
+                separator_idx = index
+                looking_for_separator = False
+            elif value != 0:
+                invalid = True
+    if invalid or looking_for_separator:
+        raise ValueError("Erro de decifragem OAEP.")
     return db[separator_idx + 1:]
+
 
 # -----------------------------------------------------------------------------
 # 3. PARTE III - ASSINATURA DIGITAL RSA-PSS

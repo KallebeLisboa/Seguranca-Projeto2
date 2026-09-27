@@ -77,11 +77,15 @@ As chaves privadas são JSON sem cifragem. O parser carrega todo o arquivo na me
 e não impõe quotas para entradas gigantes, portanto não deve ser exposto como
 serviço de verificação de conteúdo não confiável sem limites adicionais.
 
-A Parte II herdada ainda requer revisão específica: a decifragem OAEP procura o
-separador, mas não valida todos os zeros anteriores e não rejeita explicitamente
-representantes de ciphertext maiores ou iguais a `n`. Suas mensagens de erro e
-comparações também não garantem proteção contra oráculos de padding/tempo.
-A suíte das Partes IV/V não certifica OAEP nem audita integralmente as Partes I–III.
+A decifragem OAEP valida o primeiro byte, o hash do label, todos os zeros do
+padding e o delimitador. Rejeita representantes de ciphertext maiores ou iguais
+a `n` antes da exponenciação. Falhas de ciphertext usam a mesma mensagem de erro;
+o hash do label é comparado com `compare_digest`. A varredura percorre todo o
+bloco recuperado, mas os desvios condicionais e a aritmética Python continuam
+sem garantia de tempo constante. Os testes incluem blocos OAEP malformados,
+limites de mensagem e módulos não alinhados em bytes. A importação das chaves
+privadas ainda precisa de validações adicionais, registradas em
+[PENDENCIAS.md](PENDENCIAS.md).
 
 O teste de interoperabilidade adicional verifica a saída PSS manual com uma
 implementação independente e rejeita uma mensagem alterada. Isso dá evidência de

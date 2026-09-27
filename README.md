@@ -21,6 +21,8 @@ A execução principal usa apenas a biblioteca padrão; Python 3.9 ou superior.
 | `rsa_crypto.py` | Partes II–IV: OAEP, assinatura e verificação PSS |
 | `signed_file.py` | Parte IV: estrutura assinada, parsing e interface de execução |
 | `tests/test_verification.py` | Casos válidos, adulterações e entradas malformadas |
+| `tests/test_oaep.py` | Cifragem/decifragem, limites e rejeição de padding inválido |
+| `PENDENCIAS.md` | Checklist de correções, apresentação e entrega |
 | `tests/test_interop.py` | Teste adicional opcional com biblioteca independente |
 | `ANALISE_SEGURANCA.md` | Parte V: justificativas, comparação e limitações |
 
@@ -59,6 +61,8 @@ A suíte cobre arquivo válido, vazio e binário; alteração de um byte do cont
 da assinatura e do módulo público; outra chave válida; JSON inválido/duplicado;
 Base64 inválido; tamanhos e parâmetros inconsistentes; assinatura fora do intervalo;
 padding PSS adulterado; salt probabilístico e códigos de saída da interface.
+Os testes OAEP cobrem mensagem vazia e no limite, label incorreto, ciphertext
+adulterado ou fora do intervalo, padding malformado e módulo de 2049 bits.
 As chaves de teste são geradas pelo próprio projeto e não são gravadas no repositório.
 
 O teste independente é opcional e fica marcado como `skipped` sem a dependência:
