@@ -28,6 +28,8 @@ def mod_exp(base: int, exp: int, mod: int) -> int:
     Calcula (base ** exp) % mod usando apenas multiplicações e módulos, em tempo O(log exp)
     """
 
+    if any(type(v) is not int for v in (base, exp, mod)) or exp < 0 or mod <= 0:
+        raise ValueError("Exponenciação exige inteiros, expoente não negativo e módulo positivo.")
     if mod == 1:
         return 0
     result = 1
@@ -72,6 +74,8 @@ def mod_inverse(a: int, m: int) -> int:
 
     Lança ValueError se o inverso não existir (isto é, se mdc(a, m) != 1).
     """
+    if type(a) is not int or type(m) is not int or m <= 1:
+        raise ValueError("Inverso exige inteiros e módulo maior que 1.")
     g, x, _ = extended_gcd(a % m, m)
     if g != 1:
         raise ValueError(f"Inverso modular inexistente: mdc({a}, {m}) = {g}")
@@ -100,6 +104,8 @@ def is_probable_prime(n: int, rounds: int = 20) -> bool:
         False -> n é certamente composto.
     """
 
+    if type(n) is not int or type(rounds) is not int or rounds < 1:
+        raise ValueError("Miller-Rabin exige inteiro e ao menos uma rodada.")
     if n < 2:
         return False
     if n in _SMALL_PRIMES:
@@ -143,7 +149,9 @@ def generate_prime(bits: int, rounds: int = 20) -> int:
     número de bits esperado) e o bit menos significativo (garante que o
     número é ímpar), testando cada candidato com Miller-Rabin.
     """
-    if bits < 8:
+    if type(rounds) is not int or rounds < 1:
+        raise ValueError("O número de rodadas deve ser inteiro positivo.")
+    if type(bits) is not int or bits < 8:
         raise ValueError("bits deve ser >= 8 para geração de primos RSA.")
 
     while True:
@@ -177,9 +185,11 @@ def generate_keypair(key_size_bits: int = 2048, e: int = DEFAULT_PUBLIC_EXPONENT
         (chave_publica, chave_privada), cada uma como um dicionário
         contendo os parâmetros RSA relevantes (todos como inteiros).
     """
-    if not isinstance(key_size_bits, int) or key_size_bits < 2048:
+    if type(miller_rabin_rounds) is not int or miller_rabin_rounds < 1:
+        raise ValueError("O número de rodadas deve ser inteiro positivo.")
+    if type(key_size_bits) is not int or key_size_bits < 2048:
         raise ValueError("O módulo RSA deve ter, no mínimo, 2048 bits.")
-    if e < 3 or e % 2 == 0:
+    if type(e) is not int or e < 3 or e % 2 == 0 or e.bit_length() > key_size_bits:
         raise ValueError("Expoente público 'e' inválido (deve ser ímpar e >= 3).")
 
     half = key_size_bits // 2
@@ -193,7 +203,7 @@ def generate_keypair(key_size_bits: int = 2048, e: int = DEFAULT_PUBLIC_EXPONENT
             continue  # p e q precisam ser distintos
 
         n = p * q
-        if n.bit_length() < key_size_bits:
+        if n.bit_length() < key_size_bits or e >= n:
             continue  # produto ficou curto por azar na geração. Tenta de novo
 
         phi = (p - 1) * (q - 1)  # função totiente de Euler

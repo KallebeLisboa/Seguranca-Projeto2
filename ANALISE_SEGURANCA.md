@@ -88,10 +88,10 @@ dos fatores e expoentes, produto dos fatores e relações RSA/CRT, incluindo
 `qinv`. Também reaplica Miller-Rabin aos fatores (20 rodadas por fator); essa
 verificação é probabilística, não uma prova de primalidade. O formato próprio
 exige `d` como inverso canônico módulo `phi(n)`, conforme a geração do projeto.
-Isso não é um importador genérico de outros formatos RSA. As demais pendências
-estão em [PENDENCIAS.md](PENDENCIAS.md).
+Isso não é um importador genérico de outros formatos RSA.
 
-O teste de interoperabilidade adicional verifica a saída PSS manual com uma
-implementação independente e rejeita uma mensagem alterada. Isso dá evidência de
+Os testes de interoperabilidade adicionais verificam a saída PSS manual com
+`cryptography` e decifram a saída OAEP/SHA3-256 com `pycryptodome`, incluindo
+controles de adulteração. As bibliotecas apenas verificam resultados do grupo. Isso dá evidência de
 compatibilidade do perfil testado, sem constituir prova formal de segurança ou
 auditoria de todos os caminhos do programa.

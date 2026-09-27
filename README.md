@@ -21,9 +21,11 @@ A execução principal usa apenas a biblioteca padrão; Python 3.9 ou superior.
 | `rsa_crypto.py` | Partes II–IV: OAEP, assinatura e verificação PSS |
 | `signed_file.py` | Parte IV: estrutura assinada, parsing e interface de execução |
 | `tests/test_verification.py` | Casos válidos, adulterações e entradas malformadas |
+| `tests/test_keygen.py` | Aritmética, Miller-Rabin e geração de chaves |
+| `tests/test_encoding.py` | Vetores MGF1 e conversões de inteiros/bytes |
 | `tests/test_private_key.py` | Importação privada, adulterações e consistência RSA/CRT |
 | `tests/test_oaep.py` | Cifragem/decifragem, limites e rejeição de padding inválido |
-| `PENDENCIAS.md` | Checklist de correções, apresentação e entrega |
+| `GUIA_RAPIDO.md` | Comandos para executar e demonstrar o projeto |
 | `tests/test_interop.py` | Teste adicional opcional com biblioteca independente |
 | `ANALISE_SEGURANCA.md` | Parte V: justificativas, comparação e limitações |
 
@@ -66,16 +68,25 @@ Os testes OAEP cobrem mensagem vazia e no limite, label incorreto, ciphertext
 adulterado ou fora do intervalo, padding malformado e módulo de 2049 bits.
 As chaves de teste são geradas pelo próprio projeto e não são gravadas no repositório.
 
-O teste independente é opcional e fica marcado como `skipped` sem a dependência:
+Os testes independentes são opcionais e ficam marcados como `skipped` sem suas dependências:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install cryptography
+.venv/bin/python -m pip install cryptography pycryptodome
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-A biblioteca externa apenas verifica uma assinatura produzida pelo grupo, incluindo
-um controle negativo. Não participa da implementação nem da geração das chaves.
+As bibliotecas externas somente verificam saídas do grupo: `cryptography` verifica
+PSS e `pycryptodome` decifra OAEP/SHA3-256, com controles negativos. As chaves
+são geradas manualmente pelo projeto. Nenhuma dessas dependências participa da
+implementação principal. A versão de `cryptography` testada não suporta OAEP
+com SHA3-256, por isso esse teste usa `pycryptodome`.
+
+A Parte I também compara aritmética com oráculos da biblioteca padrão, verifica
+Miller-Rabin com testemunhas controladas (incluindo pseudoprimo forte), testa
+parâmetros inválidos e relações RSA/CRT. Os vetores MGF1 são constantes de
+regressão calculadas separadamente com SHA3-256 e contadores explícitos; não
+são vetores oficiais NIST.
 
 ## Formatos e contrato de verificação
 
@@ -111,7 +122,7 @@ A chave pública é fornecida separadamente e deve vir de uma fonte confiável.
 
 ## Entrega no Moodle
 
-Incluir os três módulos Python, a pasta `tests`, este README e a análise de segurança.
+Incluir os três módulos Python, a pasta `tests`, este README, o guia rápido e a análise de segurança.
 Executar os testes e conferir o conteúdo do pacote.
 Não incluir `.venv`, caches ou chaves privadas pessoais. Os comandos acima geram
 os exemplos necessários à apresentação. Consultar a [análise de segurança](ANALISE_SEGURANCA.md)

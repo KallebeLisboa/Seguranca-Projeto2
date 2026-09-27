@@ -29,6 +29,8 @@ def mgf1(seed: bytes, mask_len: int) -> bytes:
     Mask Generation Function (MGF1) utilizando SHA3-256.
     Gera uma máscara de tamanho arbitrário a partir de uma semente inicial.
     """
+    if type(mask_len) is not int or not 0 <= mask_len <= 32 * (1 << 32):
+        raise ValueError("Comprimento de máscara MGF1 inválido.")
     t = b''
     for counter in range((mask_len + 31) // 32):
         c = i2osp(counter, 4)
