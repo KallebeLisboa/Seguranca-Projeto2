@@ -16,12 +16,14 @@ correções implementadas e verificadas, não uma certificação de segurança.
 
 ## 2. Importação de chaves privadas
 
-- [ ] Validar `algorithm`, tamanho declarado e parâmetros públicos.
-- [ ] Validar `qinv`, limites dos parâmetros e consistência matemática completa.
-- [ ] Rejeitar entradas inválidas sem exceções aritméticas não controladas.
-- [ ] Testar adulterações em cada parâmetro e importação/exportação válida.
+- [x] Validar `algorithm`, tamanho declarado e parâmetros públicos.
+- [x] Validar `qinv`, limites dos parâmetros e consistência matemática completa.
+- [x] Rejeitar entradas inválidas sem exceções aritméticas não controladas.
+- [x] Testar adulterações em cada parâmetro e importação/exportação válida.
 
-A validação básica adicionada à operação OAEP não substitui a revisão do importador.
+O importador verifica limites antes das operações aritméticas, relações RSA/CRT
+e primalidade probabilística dos fatores com Miller-Rabin. Os testes cobrem
+adulterações, entradas malformadas e uso de uma chave válida após importação.
 
 ## 3. Cobertura das Partes I e II
 

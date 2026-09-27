@@ -392,34 +392,38 @@ def import_private_key(filepath: str) -> Dict:
     '''
     data = _load_json(filepath)
 
-    required_fields = {"format", "n", "e", "d", "p", "q", "dp", "dq", "qinv", "key_size_bits"}
+    required_fields = {"format", "algorithm", "n", "e", "d", "p", "q", "dp", "dq", "qinv", "key_size_bits"}
     if not required_fields.issubset(data):
-        faltando = required_fields - set(data)
-        raise KeyFormatError(f"Campos obrigatórios ausentes na chave privada: {faltando}")
-
-    if data["format"] != PRIVATE_KEY_FORMAT:
-        raise KeyFormatError(f"Formato de chave privada não reconhecido: {data['format']!r}")
-
+        raise KeyFormatError("Campos obrigatórios ausentes na chave privada.")
+    if data["format"] != PRIVATE_KEY_FORMAT or data["algorithm"] != "RSA":
+        raise KeyFormatError("Formato ou algoritmo da chave privada inválido.")
     try:
         valores = {campo: _b64_to_int(data[campo])
-                for campo in ("n", "e", "d", "p", "q", "dp", "dq", "qinv")}
-    except Exception as exc:
-        raise KeyFormatError(f"Falha ao decodificar parâmetros da chave: {exc}") from exc
+                   for campo in ("n", "e", "d", "p", "q", "dp", "dq", "qinv")}
+    except (ValueError, TypeError) as exc:
+        raise KeyFormatError("Parâmetro privado não é Base64 válido.") from exc
 
-    # Validações de consistência matemática (detecção de adulteração) ---
-    if valores["p"] * valores["q"] != valores["n"]:
+    valores["key_size_bits"] = data["key_size_bits"]
+    validate_public_key(valores)
+    n, e, d = valores["n"], valores["e"], valores["d"]
+    p, q = valores["p"], valores["q"]
+    # Limites antes de qualquer módulo por p-1, q-1 ou phi.
+    if not (3 <= p < n and 3 <= q < n) or p == q or p % 2 == 0 or q % 2 == 0:
+        raise KeyFormatError("Fatores privados inválidos.")
+    if p * q != n:
         raise KeyFormatError("Chave corrompida: p * q != n.")
+    phi = (p - 1) * (q - 1)
+    # O formato do grupo armazena d como o inverso canônico módulo phi.
+    if not 0 < d < phi or (e * d) % phi != 1:
+        raise KeyFormatError("Expoente privado inconsistente com phi(n).")
+    if valores["dp"] != d % (p - 1) or valores["dq"] != d % (q - 1):
+        raise KeyFormatError("Parâmetros CRT dp/dq inconsistentes.")
+    if not 0 < valores["qinv"] < p or (q * valores["qinv"]) % p != 1:
+        raise KeyFormatError("Parâmetro CRT qinv inconsistente.")
+    # Relações algébricas isoladas não garantem que os fatores sejam primos.
+    if not is_probable_prime(p) or not is_probable_prime(q):
+        raise KeyFormatError("Fatores privados compostos.")
 
-    phi = (valores["p"] - 1) * (valores["q"] - 1)
-    if (valores["e"] * valores["d"]) % phi != 1:
-        raise KeyFormatError("Chave corrompida: e * d != 1 (mod phi(n)).")
-
-    if valores["dp"] != valores["d"] % (valores["p"] - 1):
-        raise KeyFormatError("Chave corrompida: parâmetro CRT 'dp' inconsistente.")
-    if valores["dq"] != valores["d"] % (valores["q"] - 1):
-        raise KeyFormatError("Chave corrompida: parâmetro CRT 'dq' inconsistente.")
-
-    valores["key_size_bits"] = data.get("key_size_bits", valores["n"].bit_length())
     return valores
 
 

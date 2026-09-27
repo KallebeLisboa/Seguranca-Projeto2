@@ -21,6 +21,7 @@ A execução principal usa apenas a biblioteca padrão; Python 3.9 ou superior.
 | `rsa_crypto.py` | Partes II–IV: OAEP, assinatura e verificação PSS |
 | `signed_file.py` | Parte IV: estrutura assinada, parsing e interface de execução |
 | `tests/test_verification.py` | Casos válidos, adulterações e entradas malformadas |
+| `tests/test_private_key.py` | Importação privada, adulterações e consistência RSA/CRT |
 | `tests/test_oaep.py` | Cifragem/decifragem, limites e rejeição de padding inválido |
 | `PENDENCIAS.md` | Checklist de correções, apresentação e entrega |
 | `tests/test_interop.py` | Teste adicional opcional com biblioteca independente |
@@ -83,6 +84,9 @@ As chaves são objetos JSON com `format`, `algorithm: "RSA"`, `key_size_bits`,
 A pública usa `CIC0201-RSA-PUB-v1` e os campos `n`, `e`.
 A privada usa `CIC0201-RSA-PRIV-v1` e também `d`, `p`, `q`, `dp`, `dq`, `qinv`.
 O timestamp é informativo, não autenticado. A chave privada fica em texto claro.
+A importação privada valida limites, relações RSA/CRT e primalidade probabilística
+dos fatores. Neste formato, `d` é o inverso canônico de `e` módulo `phi(n)`,
+com `0 < d < phi(n)`, conforme a geração do grupo.
 
 A estrutura assinada é um objeto JSON UTF-8 com exatamente estes campos:
 

@@ -83,9 +83,13 @@ a `n` antes da exponenciação. Falhas de ciphertext usam a mesma mensagem de er
 o hash do label é comparado com `compare_digest`. A varredura percorre todo o
 bloco recuperado, mas os desvios condicionais e a aritmética Python continuam
 sem garantia de tempo constante. Os testes incluem blocos OAEP malformados,
-limites de mensagem e módulos não alinhados em bytes. A importação das chaves
-privadas ainda precisa de validações adicionais, registradas em
-[PENDENCIAS.md](PENDENCIAS.md).
+limites de mensagem e módulos não alinhados em bytes. A importação privada valida algoritmo, tamanho e parâmetros públicos, limites
+dos fatores e expoentes, produto dos fatores e relações RSA/CRT, incluindo
+`qinv`. Também reaplica Miller-Rabin aos fatores (20 rodadas por fator); essa
+verificação é probabilística, não uma prova de primalidade. O formato próprio
+exige `d` como inverso canônico módulo `phi(n)`, conforme a geração do projeto.
+Isso não é um importador genérico de outros formatos RSA. As demais pendências
+estão em [PENDENCIAS.md](PENDENCIAS.md).
 
 O teste de interoperabilidade adicional verifica a saída PSS manual com uma
 implementação independente e rejeita uma mensagem alterada. Isso dá evidência de
