@@ -262,7 +262,7 @@ PUBLIC_KEY_FORMAT = "CIC0201-RSA-PUB-v1"
 PRIVATE_KEY_FORMAT = "CIC0201-RSA-PRIV-v1"
 
 
-class KeyFormatError(Exception):
+class KeyFormatError(ValueError):
     """
     Erro lançado quando um arquivo de chave está ausente, mal formado,
     incompleto ou falha em uma verificação de consistência matemática
@@ -276,7 +276,12 @@ def _int_to_b64(value: int) -> str:
 
 
 def _b64_to_int(text: str) -> int:
-    return int.from_bytes(base64.b64decode(text), byteorder="big")
+    if not isinstance(text, str):
+        raise ValueError("Parâmetro Base64 deve ser texto.")
+    raw = base64.b64decode(text, validate=True)
+    if not raw or base64.b64encode(raw).decode("ascii") != text:
+        raise ValueError("Base64 vazio ou não canônico.")
+    return int.from_bytes(raw, byteorder="big")
 
 
 def _timestamp() -> str:
@@ -317,13 +322,40 @@ def export_private_key(private_key: Dict, filepath: str) -> None:
         json.dump(data, f, indent=2)
 
 
+def _unique_fields(pairs):
+    data = {}
+    for key, value in pairs:
+        if key in data:
+            raise KeyFormatError(f"Campo repetido: {key}")
+        data[key] = value
+    return data
+
+
+def validate_public_key(key: Dict) -> None:
+    """Valida estrutura e limites; não certifica a identidade do proprietário."""
+    if not isinstance(key, dict) or any(
+        type(key.get(field)) is not int for field in ("n", "e", "key_size_bits")
+    ):
+        raise KeyFormatError("Parâmetros públicos devem ser inteiros.")
+    n, e, bits = key["n"], key["e"], key["key_size_bits"]
+    if n <= 0 or n % 2 == 0 or n.bit_length() < 2048:
+        raise KeyFormatError("Módulo RSA deve ser ímpar e ter ao menos 2048 bits.")
+    if bits != n.bit_length():
+        raise KeyFormatError("Tamanho declarado não corresponde ao módulo.")
+    if not 3 <= e < n or e % 2 == 0:
+        raise KeyFormatError("Expoente público inválido.")
+
+
 def _load_json(filepath: str) -> Dict:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f, object_pairs_hook=_unique_fields)
+            if not isinstance(data, dict):
+                raise KeyFormatError("A chave deve ser um objeto JSON.")
+            return data
     except FileNotFoundError as exc:
         raise KeyFormatError(f"Arquivo de chave não encontrado: {filepath}") from exc
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeError) as exc:
         raise KeyFormatError(f"Arquivo de chave não é um JSON válido: {exc}") from exc
 
 
@@ -331,12 +363,12 @@ def import_public_key(filepath: str) -> Dict:
     '''Importa e valida uma chave pública a partir de um arquivo JSON.'''
     data = _load_json(filepath)
 
-    required_fields = {"format", "n", "e", "key_size_bits"}
+    required_fields = {"format", "algorithm", "n", "e", "key_size_bits"}
     if not required_fields.issubset(data):
         faltando = required_fields - set(data)
         raise KeyFormatError(f"Campos obrigatórios ausentes na chave pública: {faltando}")
 
-    if data["format"] != PUBLIC_KEY_FORMAT:
+    if data["format"] != PUBLIC_KEY_FORMAT or data["algorithm"] != "RSA":
         raise KeyFormatError(f"Formato de chave pública não reconhecido: {data['format']!r}")
 
     try:
@@ -345,12 +377,9 @@ def import_public_key(filepath: str) -> Dict:
     except Exception as exc:
         raise KeyFormatError(f"Falha ao decodificar parâmetros da chave: {exc}") from exc
 
-    if n.bit_length() < 2047:  # tolerância de 1 bit por arredondamento
-        raise KeyFormatError("Módulo 'n' menor que o mínimo exigido (2048 bits).")
-    if e < 3 or e % 2 == 0:
-        raise KeyFormatError("Expoente público 'e' inválido.")
-
-    return {"n": n, "e": e, "key_size_bits": data.get("key_size_bits", n.bit_length())}
+    key = {"n": n, "e": e, "key_size_bits": data["key_size_bits"]}
+    validate_public_key(key)
+    return key
 
 
 def import_private_key(filepath: str) -> Dict:

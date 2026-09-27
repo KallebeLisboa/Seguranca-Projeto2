@@ -1,7 +1,9 @@
 import hashlib
+import hmac
+import binascii
 import os
 import base64
-from rsa_keygen import mod_exp, import_public_key, import_private_key
+from rsa_keygen import mod_exp, validate_public_key
 
 # -----------------------------------------------------------------------------
 # 1. FUNÇÕES AUXILIARES E CONVERSÕES (RFC 8017)
@@ -110,7 +112,8 @@ def rsa_pss_sign(priv_key: dict, file_data: bytes) -> str:
     m_hash = hashlib.sha3_256(file_data).digest()
     h_len = 32
     s_len = 32 # Tamanho do salt
-    em_len = (priv_key['key_size_bits'] - 1 + 7) // 8
+    em_bits = priv_key['n'].bit_length() - 1
+    em_len = (em_bits + 7) // 8
     
     salt = os.urandom(s_len)
     m_prime = b'\x00' * 8 + m_hash + salt
@@ -124,31 +127,44 @@ def rsa_pss_sign(priv_key: dict, file_data: bytes) -> str:
     
     # Força o bit mais significativo a 0 conforme a especificação do PSS
     masked_db_list = bytearray(masked_db)
-    masked_db_list[0] &= 0xFF >> (8 * em_len - (priv_key['key_size_bits'] - 1))
+    masked_db_list[0] &= 0xFF >> (8 * em_len - em_bits)
     masked_db = bytes(masked_db_list)
     
     em = masked_db + h + b'\xbc'
     m_int = os2ip(em)
     s_int = mod_exp(m_int, priv_key['d'], priv_key['n'])
     
-    signature = i2osp(s_int, priv_key['key_size_bits'] // 8)
+    signature = i2osp(s_int, (priv_key['n'].bit_length() + 7) // 8)
     return base64.b64encode(signature).decode('ascii')
 
 def rsa_pss_verify(pub_key: dict, file_data: bytes, signature_b64: str) -> bool:
     """Verifica uma assinatura RSA-PSS contra os dados fornecidos."""
-    signature = base64.b64decode(signature_b64)
-    k = pub_key['key_size_bits'] // 8
+    try:
+        validate_public_key(pub_key)
+        if not isinstance(signature_b64, str):
+            return False
+        signature = base64.b64decode(signature_b64, validate=True)
+        if base64.b64encode(signature).decode('ascii') != signature_b64:
+            return False
+    except (ValueError, TypeError, binascii.Error):
+        return False
+    k = (pub_key['n'].bit_length() + 7) // 8
     h_len = 32
     s_len = 32
-    em_len = (pub_key['key_size_bits'] - 1 + 7) // 8
-    
-    if len(signature) != k:
+    em_bits = pub_key['n'].bit_length() - 1
+    em_len = (em_bits + 7) // 8
+
+    if len(signature) != k or em_len < h_len + s_len + 2:
         return False
-        
     s_int = os2ip(signature)
+    if s_int >= pub_key['n']:
+        return False
     m_int = mod_exp(s_int, pub_key['e'], pub_key['n'])
-    em = i2osp(m_int, em_len)
-    
+    try:
+        em = i2osp(m_int, em_len)
+    except ValueError:
+        return False
+
     m_hash = hashlib.sha3_256(file_data).digest()
     
     if em[-1] != 0xbc:
@@ -157,12 +173,12 @@ def rsa_pss_verify(pub_key: dict, file_data: bytes, signature_b64: str) -> bool:
     masked_db = em[:em_len - h_len - 1]
     h = em[em_len - h_len - 1:-1]
     
-    if masked_db[0] & (0xFF << (8 - (8 * em_len - (pub_key['key_size_bits'] - 1)))):
+    if masked_db[0] & (0xFF << (8 - (8 * em_len - em_bits))):
         return False
         
     db_mask = mgf1(h, em_len - h_len - 1)
     db = bytearray(xor_bytes(masked_db, db_mask))
-    db[0] &= 0xFF >> (8 * em_len - (pub_key['key_size_bits'] - 1))
+    db[0] &= 0xFF >> (8 * em_len - em_bits)
     db = bytes(db)
     
     if db[:em_len - h_len - s_len - 2] != b'\x00' * (em_len - h_len - s_len - 2) or db[em_len - h_len - s_len - 2] != 0x01:
@@ -172,4 +188,4 @@ def rsa_pss_verify(pub_key: dict, file_data: bytes, signature_b64: str) -> bool:
     m_prime = b'\x00' * 8 + m_hash + salt
     h_prime = hashlib.sha3_256(m_prime).digest()
     
-    return h == h_prime
+    return hmac.compare_digest(h, h_prime)
