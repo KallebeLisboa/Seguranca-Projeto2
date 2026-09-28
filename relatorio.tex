@@ -1,0 +1,273 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{booktabs}
+
+\begin{document}
+
+\title{Trabalho 2 -- CIC0201: Cifragem RSA-OAEP e Assinatura Digital RSA-PSS com SHA3-256}
+
+\author{
+\IEEEauthorblockN{Rafael de Lima Pereira}
+\IEEEauthorblockA{Matrícula: 242043277}
+\and
+\IEEEauthorblockN{Pedro Freitas França}
+\IEEEauthorblockA{Matrícula: 232006028}
+\and
+\IEEEauthorblockN{Rian Kallebe da Silva Lisboa}
+\IEEEauthorblockA{Matrícula: 242012000}
+\and
+\IEEEauthorblockN{Arthur Martins Pereira de Souza}
+\IEEEauthorblockA{Matrícula: 241004499}
+}
+
+\maketitle
+
+\begin{abstract}
+Este trabalho apresenta uma implementação didática, em Python puro, do algoritmo RSA e dos
+esquemas RSA-OAEP e RSA-PSS com SHA3-256, cobrindo geração de chaves, cifragem, assinatura
+digital de arquivos e verificação de integridade. Toda a aritmética modular, o teste de
+primalidade de Miller-Rabin e as codificações de padding foram implementados manualmente,
+sem bibliotecas criptográficas externas na via principal. Os resultados experimentais,
+obtidos por uma suíte com 46 testes automatizados e por bibliotecas independentes usadas
+apenas para verificação cruzada, confirmam a corretude do esquema e sua capacidade de
+rejeitar adulterações no conteúdo, na assinatura e na chave.
+\end{abstract}
+
+\begin{IEEEkeywords}
+RSA, OAEP, PSS, SHA3-256, assinatura digital, segurança computacional
+\end{IEEEkeywords}
+
+\section{Introdução}
+
+A disciplina de Segurança Computacional (CIC0201), inserida no contexto mais amplo de redes
+de computadores, trata da garantia de propriedades como confidencialidade, integridade e
+autenticidade em comunicações e no armazenamento de dados. Sistemas de criptografia de chave
+pública, como o RSA, são fundamento de protocolos amplamente usados em redes, a exemplo do
+TLS e da assinatura de pacotes de software, permitindo que partes que nunca compartilharam um
+segredo estabeleçam comunicação segura ou verifiquem a origem de um arquivo.
+
+Este trabalho tem como objetivo consolidar, por meio de implementação manual, o entendimento
+dos mecanismos internos do RSA e dos esquemas de preenchimento (\textit{padding}) que o tornam
+seguro na prática: o OAEP (\textit{Optimal Asymmetric Encryption Padding}), usado para
+cifragem, e o PSS (\textit{Probabilistic Signature Scheme}), usado para assinatura digital.
+Diferentemente do uso de uma biblioteca pronta, a implementação dos algoritmos matemáticos e
+das codificações a partir da especificação evidencia por que RSA sem preenchimento é inseguro
+e como cada etapa dos esquemas OAEP e PSS contribui para as garantias de segurança
+correspondentes.
+
+O relatório está estruturado da seguinte forma: a Seção II apresenta a fundamentação teórica
+sobre aritmética modular, geração de chaves RSA, OAEP e PSS; a Seção III descreve o ambiente
+experimental e analisa os resultados obtidos com a suíte de testes e com a demonstração de
+ponta a ponta; a Seção IV apresenta as conclusões técnicas; e a Seção V lista as referências
+bibliográficas, que também indica o repositório público onde o código-fonte completo do
+projeto está disponível~\cite{repo}.
+
+\section{Fundamentação Teórica}
+
+\subsection{Aritmética modular e geração de chaves RSA}
+
+O RSA baseia-se na dificuldade computacional de fatorar o produto de dois números primos
+grandes~\cite{menezes1996handbook}. A geração de chaves consiste em escolher dois primos $p$
+e $q$ distintos, calcular o módulo $n = p \cdot q$ e a função totiente de Euler
+$\varphi(n) = (p-1)(q-1)$, selecionar um expoente público $e$ coprimo com $\varphi(n)$ e
+calcular o expoente privado $d$ como o inverso multiplicativo de $e$ módulo $\varphi(n)$, isto
+é, $e \cdot d \equiv 1 \pmod{\varphi(n)}$.
+
+Neste projeto, a exponenciação modular rápida foi implementada pelo método
+\textit{square-and-multiply}, que calcula $\text{base}^{\text{exp}} \bmod n$ em tempo
+$O(\log(\text{exp}))$ multiplicações, e o inverso modular foi obtido pelo Algoritmo Estendido
+de Euclides. A geração dos primos $p$ e $q$ usa candidatos aleatórios de tamanho fixo (obtidos
+com a fonte de aleatoriedade criptograficamente segura do sistema operacional, via
+\texttt{secrets.randbits}) filtrados pelo teste probabilístico de primalidade de Miller-Rabin.
+Esse teste explora a fatoração $n - 1 = 2^{s}d$, com $d$ ímpar, e testemunhas aleatórias $a$: se
+nenhuma sequência de quadrados sucessivos de $a^{d}$ atinge $n-1$ antes de $a^{2^{s-1}d}$, o
+número é declarado composto; caso contrário, é provavelmente primo. Com $r$ rodadas
+independentes, a probabilidade de um composto ser aceito erroneamente é, no pior caso, no
+máximo $4^{-r}$~\cite{menezes1996handbook}; o projeto usa 20 rodadas por padrão. Também são
+calculados os parâmetros do Teorema Chinês do Resto ($d_p$, $d_q$, $q^{-1} \bmod p$), que
+aceleram operações com a chave privada.
+
+As chaves geradas (módulo mínimo de 2048 bits) são serializadas em um formato JSON próprio,
+com os inteiros grandes representados em Base64 sobre uma codificação \textit{big-endian}. A
+importação de chaves privadas revalida estruturalmente todos os parâmetros e as relações
+algébricas ($p \cdot q = n$, $e \cdot d \equiv 1 \bmod \varphi(n)$, consistência de $d_p$,
+$d_q$ e $q^{-1}$) e reaplica Miller-Rabin aos fatores, de modo a detectar arquivos de chave
+corrompidos ou adulterados antes de qualquer operação criptográfica.
+
+\subsection{RSA-OAEP: cifragem com preenchimento ótimo}
+
+A aplicação direta do RSA a uma mensagem (RSA "de livro-texto") é determinística e
+matematicamente estruturada, o que a torna vulnerável a ataques que exploram a maleabilidade
+multiplicativa do esquema. O OAEP, especificado na RFC~8017~\cite{rfc8017}, resolve esse
+problema combinando a mensagem com uma semente aleatória antes da exponenciação pública,
+usando uma função geradora de máscara (MGF1) construída sobre uma função de hash -- neste
+trabalho, SHA3-256~\cite{fips202}. A cifragem calcula o hash de um rótulo (\textit{label}),
+monta um bloco de dados com preenchimento de zeros e um separador, mascara esse bloco com uma
+semente aleatória via MGF1 e, em seguida, mascara a própria semente com o hash do bloco
+mascarado, produzindo uma cifragem probabilística: mensagens iguais cifradas com a mesma chave
+produzem criptogramas diferentes a cada execução. A decifragem inverte as máscaras, recalcula
+o hash do rótulo e verifica cada zero de preenchimento e o byte separador com comparação de
+tempo constante (\texttt{hmac.compare\_digest}) antes de aceitar a mensagem recuperada,
+rejeitando com uma única mensagem de erro genérica qualquer falha estrutural.
+
+\subsection{RSA-PSS: assinatura digital probabilística}
+
+O PSS, também especificado na RFC~8017~\cite{rfc8017}, é um esquema de assinatura que combina
+o hash da mensagem com um \textit{salt} aleatório antes de codificar um bloco de dados
+mascarado por MGF1, finalizado com um byte de traço (\textit{trailer}) fixo (\texttt{0xbc}).
+Como o \textit{salt} é gerado aleatoriamente a cada assinatura, duas assinaturas da mesma
+mensagem com a mesma chave são diferentes entre si, mas ambas válidas. A verificação recalcula
+o hash da mensagem, extrai o \textit{salt} do bloco de dados desmascarado, reconstrói o hash
+esperado e o compara ao hash embutido na assinatura com \texttt{hmac.compare\_digest}. Diferente
+do OAEP, cuja finalidade é confidencialidade, o PSS provê integridade e autenticidade
+relativas à posse da chave privada correspondente, sem ocultar o conteúdo assinado.
+
+\subsection{Comparação com Ed25519}
+
+Como contraponto ao RSA-PSS, o esquema de assinatura Ed25519 (RFC~8032~\cite{rfc8032}), baseado
+no problema do logaritmo discreto sobre uma curva de Edwards, produz assinaturas de 64 bytes e
+chaves públicas de 32 bytes, ordens de grandeza menores que os 256 bytes de assinatura e chave
+usados pelo perfil RSA de 2048 bits deste trabalho. Além disso, o Ed25519 deriva o
+\textit{nonce} de assinatura deterministicamente a partir da chave e da mensagem, dispensando
+uma nova fonte de aleatoriedade de alta qualidade a cada assinatura -- ainda que a geração da
+chave em si continue exigindo aleatoriedade segura. O tamanho do módulo RSA não é diretamente
+comparável ao tamanho de chave de curvas elípticas em termos de nível de segurança
+equivalente~\cite{ferguson2010cryptography}.
+
+\section{Ambiente Experimental e Análise de Resultados}
+
+\subsection{Descrição do Cenário}
+
+Os experimentos foram executados em uma máquina com processador AMD Ryzen 5 5500 (12 threads
+lógicas), 14~GiB de memória RAM, sistema operacional Linux (kernel 7.0.0, distribuição baseada
+em Ubuntu) e interpretador Python 3.14.4. A implementação utiliza exclusivamente a biblioteca
+padrão do Python (\texttt{hashlib} para SHA3-256, \texttt{secrets} para aleatoriedade
+criptograficamente segura, \texttt{base64} e \texttt{json} para serialização) na via principal
+de geração de chaves, cifragem, assinatura e verificação, coerente com os conceitos descritos
+na Seção~II: nenhuma rotina de aritmética modular, MGF1, OAEP ou PSS é delegada a terceiros. O
+projeto está organizado em três módulos executáveis (\texttt{rsa\_keygen.py},
+\texttt{rsa\_crypto.py} e \texttt{signed\_file.py}) e uma suíte de seis arquivos de teste sob o
+diretório \texttt{tests/}, executada com o executor de testes padrão da linguagem
+(\texttt{unittest}). Duas bibliotecas de terceiros (\texttt{cryptography} e
+\texttt{pycryptodome}) são usadas apenas em testes de interoperabilidade opcionais, isolados em
+um ambiente virtual Python, para checar de forma independente as saídas PSS e OAEP produzidas
+pela implementação do grupo -- essas bibliotecas nunca participam da implementação principal.
+
+A interface de linha de comando de \texttt{signed\_file.py} expõe três operações: \texttt{keygen}
+(gera e exporta um par de chaves RSA de 2048 bits), \texttt{sign} (lê um arquivo, assina seus
+bytes com RSA-PSS e grava uma estrutura JSON assinada) e \texttt{verify} (importa uma chave
+pública e valida a estrutura assinada), retornando códigos de saída distintos para sucesso (0),
+assinatura ou estrutura inválida (1) e falhas operacionais como chave ou arquivo inválido (2).
+
+\subsection{Análise de Resultados}
+
+\paragraph{Geração de chaves e round-trip}
+A geração de um par de chaves RSA de 2048 bits, incluindo a busca por dois primos de 1024 bits
+aprovados em 20 rodadas de Miller-Rabin, completou em cerca de 0,39\,s neste ambiente. A
+exportação para JSON, seguida da reimportação e da checagem das relações RSA/CRT, preservou
+integralmente os parâmetros originais, confirmando o \textit{round-trip} de serialização.
+Um teste de corrupção proposital (remoção do campo \texttt{e} da chave pública exportada) foi
+corretamente rejeitado pelo importador antes de qualquer operação criptográfica.
+
+\paragraph{Demonstração de assinatura e verificação}
+Na demonstração de ponta a ponta, a assinatura RSA-PSS do arquivo \texttt{README.md}
+(6014 bytes) levou aproximadamente 0,21\,s, produzindo uma estrutura JSON assinada de
+8539 bytes; a verificação subsequente, dominada pela exponenciação modular com o expoente
+público pequeno, levou apenas 0,04\,s e reportou
+\textit{"Arquivo íntegro: assinatura RSA-PSS válida para a chave pública fornecida"}. Ao
+substituir a chave pública por uma gerada de forma independente, a mesma estrutura assinada
+foi corretamente rejeitada com a mensagem \textit{"Assinatura inválida: arquivo, estrutura ou
+chave não correspondem"} e código de saída 1, confirmando que a verificação está de fato
+vinculada à chave pública fornecida e não apenas ao formato da estrutura.
+
+\paragraph{Suíte automatizada de testes}
+A suíte completa, com 46 casos de teste distribuídos em seis arquivos, foi executada em
+5,3\,s (um teste foi ignorado por depender de uma biblioteca opcional não instalada nesta
+execução). Os testes de \texttt{test\_keygen.py} comparam a aritmética modular e o Euclides
+estendido contra os operadores nativos do Python, validam parâmetros inválidos antes da
+geração aleatória e verificam o teste de Miller-Rabin com testemunhas controladas, incluindo um
+pseudoprimo forte conhecido. Os testes de \texttt{test\_oaep.py} cobrem cifragem/decifragem no
+limite de tamanho de mensagem, rótulo incorreto, criptogramas adulterados ou fora do intervalo
+$[0, n)$, padding malformado e um módulo de 2049 bits (não alinhado a um número inteiro de
+bytes). Os testes de \texttt{test\_verification.py} alteram isoladamente um byte do conteúdo,
+da assinatura e do módulo público, trocam a chave pública por outra válida, testam Base64 não
+canônico e campos JSON duplicados, e confirmam que o \textit{salt} aleatório do PSS produz
+assinaturas diferentes a cada execução sobre a mesma mensagem -- todos os casos de adulteração
+foram corretamente rejeitados, e um caso válido foi mantido na suíte para evitar que um
+verificador que rejeitasse tudo indevidamente passasse nos testes. Os testes de
+\texttt{test\_private\_key.py} cobrem a importação de chaves privadas com JSON malformado,
+campos ausentes, fatores compostos com equações algébricas consistentes (o que exercita
+especificamente a repetição do teste de primalidade sobre os fatores) e alteração de cada
+parâmetro numérico isoladamente. Por fim, os testes de interoperabilidade em
+\texttt{test\_interop.py} confirmam que a biblioteca \texttt{cryptography} aceita como válida
+uma assinatura PSS produzida pela implementação manual do grupo, dando evidência adicional de
+conformidade com a especificação RFC~8017 além da suíte interna.
+
+\paragraph{Ajustes e problemas encontrados}
+Durante o desenvolvimento, a principal dificuldade tratada foi a validação estrita da
+importação de chaves privadas: verificações puramente algébricas isoladas (por exemplo, apenas
+$p \cdot q = n$) não garantem que $p$ e $q$ sejam de fato primos, permitindo que fatores
+compostos artificialmente consistentes passassem despercebidos; a solução adotada foi reaplicar
+Miller-Rabin aos fatores importados. Outro ajuste necessário foi tratar corretamente módulos
+RSA cujo tamanho em bits não é múltiplo de 8 (como no teste de 2049 bits), o que exige atenção
+ao número de bits usados no mascaramento do bloco de dados do PSS e do OAEP para não vazar
+informação por bits fora do intervalo esperado. Também foi necessário padronizar as mensagens
+de erro de decifragem OAEP para um único texto genérico, evitando que motivos de falha
+distintos (rótulo incorreto, padding malformado, criptograma fora do intervalo) pudessem ser
+diferenciados por um atacante observando apenas a saída da função.
+
+\section{Conclusões}
+
+A implementação manual de RSA, OAEP e PSS permitiu observar concretamente por que a
+exponenciação RSA crua é insegura e como cada etapa dos esquemas de preenchimento contribui
+para confidencialidade (OAEP) ou para integridade e autenticidade (PSS). A suíte de 46 testes
+automatizados, incluindo casos de adulteração de conteúdo, assinatura e chave, bem como
+verificação cruzada com bibliotecas independentes, deu evidência consistente de corretude do
+esquema implementado dentro do perfil escolhido (SHA3-256, módulos de ao menos 2048 bits). Ao
+mesmo tempo, a análise de segurança do projeto deixa claro que a implementação é didática: não
+há garantias de tempo constante na exponenciação modular em Python, a chave privada é
+armazenada sem cifragem, e a validação matemática da assinatura não substitui a autenticação
+independente da chave pública nem prova a identidade de quem assina.
+
+\begin{thebibliography}{9}
+
+\bibitem{rfc8017}
+K.~Moriarty, B.~Kaliski, J.~Jonsson, and A.~Rusch, ``PKCS \#1: RSA Cryptography Specifications
+Version 2.2,'' RFC~8017, IETF, Nov. 2016. [Online]. Available: \url{https://www.rfc-editor.org/rfc/rfc8017}
+
+\bibitem{fips202}
+National Institute of Standards and Technology, ``SHA-3 Standard: Permutation-Based Hash and
+Extendable-Output Functions,'' FIPS PUB 202, Aug. 2015. [Online]. Available:
+\url{https://csrc.nist.gov/pubs/fips/202/final}
+
+\bibitem{rfc8032}
+S.~Josefsson and I.~Liusvaara, ``Edwards-Curve Digital Signature Algorithm (EdDSA),'' RFC~8032,
+IETF, Jan. 2017. [Online]. Available: \url{https://www.rfc-editor.org/rfc/rfc8032}
+
+\bibitem{menezes1996handbook}
+A.~J. Menezes, P.~C. van Oorschot, and S.~A. Vanstone, \emph{Handbook of Applied Cryptography}.
+Boca Raton, FL: CRC Press, 1996.
+
+\bibitem{ferguson2010cryptography}
+N.~Ferguson, B.~Schneier, and T.~Kohno, \emph{Cryptography Engineering: Design Principles and
+Practical Applications}. Indianapolis, IN: Wiley, 2010.
+
+\bibitem{fips186}
+National Institute of Standards and Technology, ``Digital Signature Standard (DSS),''
+FIPS PUB 186-5, Feb. 2023. [Online]. Available:
+\url{https://csrc.nist.gov/pubs/fips/186/5/final}
+
+\bibitem{repo}
+R.~L. Pereira, P.~F. França, R.~K. da~S. Lisboa, and A.~M. P. de~Souza, ``Seguranca-Projeto2:
+Sistema de assinatura digital e verificação de arquivos (RSA, OAEP e PSS com SHA3-256),''
+repositório de código-fonte, GitHub, 2026. [Online]. Available:
+\url{https://github.com/KallebeLisboa/Seguranca-Projeto2}
+
+\end{thebibliography}
+
+\end{document}
