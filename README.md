@@ -118,11 +118,3 @@ fixos e validados estritamente; não há seleção de algoritmo controlada pelo 
 Espaços e ordem dos campos JSON não alteram o conteúdo assinado. Campos duplicados,
 extras, ausentes e Base64 não canônico são rejeitados. Arquivos vazios são válidos.
 A chave pública é fornecida separadamente e deve vir de uma fonte confiável.
-
-## Entrega no Moodle
-
-Incluir os três módulos Python, a pasta `tests`, este README e a análise de segurança.
-Executar os testes e conferir o conteúdo do pacote.
-Não incluir `.venv`, caches ou chaves privadas pessoais. Os comandos acima geram
-os exemplos necessários à apresentação. Consultar a [análise de segurança](ANALISE_SEGURANCA.md)
-para a arguição e as limitações conhecidas.
