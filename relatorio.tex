@@ -44,28 +44,28 @@ RSA, OAEP, PSS, SHA3-256, assinatura digital, segurança computacional
 
 \section{Introdução}
 
-A disciplina de Segurança Computacional (CIC0201), inserida no contexto mais amplo de redes
-de computadores, trata da garantia de propriedades como confidencialidade, integridade e
-autenticidade em comunicações e no armazenamento de dados. Sistemas de criptografia de chave
-pública, como o RSA, são fundamento de protocolos amplamente usados em redes, a exemplo do
-TLS e da assinatura de pacotes de software, permitindo que partes que nunca compartilharam um
-segredo estabeleçam comunicação segura ou verifiquem a origem de um arquivo.
+Em um cenário em que dados circulam continuamente por redes públicas e ficam armazenados em
+sistemas de terceiros, garantir confidencialidade, integridade e autenticidade deixou de ser
+um requisito opcional. A criptografia de chave pública torna essas garantias possíveis entre
+partes que nunca compartilharam um segredo: quem cifra usa uma chave pública, e somente o
+detentor da chave privada correspondente consegue decifrar ou produzir uma assinatura
+verificável por qualquer pessoa. Esse princípio sustenta protocolos como o TLS e mecanismos
+como a assinatura de pacotes de software.
 
-Este trabalho tem como objetivo consolidar, por meio de implementação manual, o entendimento
-dos mecanismos internos do RSA e dos esquemas de preenchimento (\textit{padding}) que o tornam
-seguro na prática: o OAEP (\textit{Optimal Asymmetric Encryption Padding}), usado para
-cifragem, e o PSS (\textit{Probabilistic Signature Scheme}), usado para assinatura digital.
-Diferentemente do uso de uma biblioteca pronta, a implementação dos algoritmos matemáticos e
-das codificações a partir da especificação evidencia por que RSA sem preenchimento é inseguro
-e como cada etapa dos esquemas OAEP e PSS contribui para as garantias de segurança
-correspondentes.
+O RSA é o exemplo mais difundido desse modelo, mas sua versão ``pura'' (\textit{textbook RSA})
+é determinística e maleável, e por isso insuficiente para uso real. Na prática, ele é sempre
+combinado com esquemas de preenchimento (\textit{padding}) que adicionam aleatoriedade e
+estrutura à mensagem: o OAEP (\textit{Optimal Asymmetric Encryption Padding}) para cifragem e
+o PSS (\textit{Probabilistic Signature Scheme}) para assinatura digital. Compreender como
+cada etapa desses esquemas contribui para a segurança final é o que separa um uso correto do
+RSA de um uso vulnerável.
 
-O relatório está estruturado da seguinte forma: a Seção II apresenta a fundamentação teórica
+O documento está organizado da seguinte forma: a Seção II apresenta a fundamentação teórica
 sobre aritmética modular, geração de chaves RSA, OAEP e PSS; a Seção III descreve o ambiente
 experimental e analisa os resultados obtidos com a suíte de testes e com a demonstração de
 ponta a ponta; a Seção IV apresenta as conclusões técnicas; e a Seção V lista as referências
-bibliográficas, que também indica o repositório público onde o código-fonte completo do
-projeto está disponível~\cite{repo}.
+bibliográficas. O código-fonte completo da implementação está disponível em repositório
+público~\cite{repo}.
 
 \section{Fundamentação Teórica}
 
@@ -256,11 +256,6 @@ Boca Raton, FL: CRC Press, 1996.
 \bibitem{ferguson2010cryptography}
 N.~Ferguson, B.~Schneier, and T.~Kohno, \emph{Cryptography Engineering: Design Principles and
 Practical Applications}. Indianapolis, IN: Wiley, 2010.
-
-\bibitem{fips186}
-National Institute of Standards and Technology, ``Digital Signature Standard (DSS),''
-FIPS PUB 186-5, Feb. 2023. [Online]. Available:
-\url{https://csrc.nist.gov/pubs/fips/186/5/final}
 
 \bibitem{repo}
 R.~L. Pereira, P.~F. França, R.~K. da~S. Lisboa, and A.~M. P. de~Souza, ``Seguranca-Projeto2:
